@@ -58,7 +58,8 @@
 void
 fatal(const char *func, int rv)
 {
-	fprintf(stderr, "%s: %s\n", func, nng_strerror(rv));
+	printf("%s: %s\n", func, nng_strerror(rv));
+	nng_msleep(1000);
 	exit(1);
 }
 
@@ -72,18 +73,19 @@ showdate(time_t now)
 int
 server(const char *url)
 {
-	nng_socket sock;
-	nng_listener listener;
-	int        rv;
-	int        count = 0;
+	for (;;) {
+		nng_socket   sock;
+		nng_listener listener;
+		int          rv;
+		int          count = 0;
 
-	if ((rv = nng_rep0_open(&sock)) != 0) {
-		fatal("nng_rep0_open", rv);
-	}
+		if ((rv = nng_rep0_open(&sock)) != 0) {
+			fatal("nng_rep0_open", rv);
+		}
 
-	if ((rv = nng_listener_create(&listener, sock, url)) != 0) {
-		fatal("nng_listener_create", rv);
-	}
+		if ((rv = nng_listener_create(&listener, sock, url)) != 0) {
+			fatal("nng_listener_create", rv);
+		}
 
 	if (strncmp(url, "zt://", 5) == 0) {
 		printf("ZeroTier transport will store its keys in current working directory.\n");
@@ -100,8 +102,7 @@ server(const char *url)
 	}
 	nng_listener_start(listener, 0);
 
-	for (;;) {
-		char *   buf = NULL;
+		char    *buf = NULL;
 		size_t   sz;
 		uint64_t val;
 		count++;
@@ -127,10 +128,25 @@ server(const char *url)
 			if (rv != 0) {
 				fatal("nng_send", rv);
 			}
+			//printf("SERVER: CLOSING\n");
+			rv = nng_listener_close(listener);
+			printf("SERVER: CLOSED\n");
+			if (rv != 0) {
+				fatal("nng_listener_close", rv);
+			}
+			rv = nng_close(sock);
+			if (rv != 0) {
+				fatal("nng_close", rv);
+			}
 			continue;
 		}
+		printf("say what?????");
 		// Unrecognized command, so toss the buffer.
 		nng_free(buf, sz);
+		rv = nng_close(sock);
+		if (rv != 0) {
+			fatal("nng_close", rv);
+		}
 	}
 }
 
@@ -141,7 +157,7 @@ client(const char *url)
 	nng_dialer dialer;
 	int        rv;
 	size_t     sz;
-	char *     buf = NULL;
+	char      *buf = NULL;
 	uint8_t    cmd[sizeof(uint64_t)];
 	int        sleep = 0;
 
@@ -189,11 +205,11 @@ client(const char *url)
 		} else {
 			printf("CLIENT: GOT WRONG SIZE!\n");
 		}
-		nng_msleep(sleep);
-		sleep++;
-		if (sleep == 4) {
-			sleep = 4000;
-		}
+		//		nng_msleep(sleep);
+		//		sleep++;
+		//		if (sleep == 4) {
+		//			sleep = 4000;
+		//		}
 	}
 
 	// This assumes that buf is ASCIIZ (zero terminated).
